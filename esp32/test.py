@@ -1,168 +1,171 @@
 import os
 from pathlib import Path
-import torch
-import torch.nn as nn
-import cv2
-import numpy as np
-from PIL import Image
 from typing import Any
 
+import numpy as np
+import torch
+import torch.nn as nn
 from fastapi import FastAPI, HTTPException
+from PIL import Image
 from pydantic import BaseModel, Field
 
 # GPU 확인
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = str(BASE_DIR / 'can_pet_model.pth')
-loaded_model = None
+MODEL_PATH = str(BASE_DIR / "can_pet_model.pth")
+loaded_bundle = None
 app = FastAPI(title="ESP32 AI Inference Service")
 
 
 class PredictRequest(BaseModel):
     image_path: str = Field(..., description="분류할 이미지 경로")
 
+
 # ============================================
-# 1. CNN 모델 정의
+# 1. CNN 모델 정의 (학습 스크립트와 동일)
 # ============================================
 class CanPetCNN(nn.Module):
-    def __init__(self):
-        super(CanPetCNN, self).__init__()
-        
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+    def __init__(self, num_classes: int):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
         self.pool1 = nn.MaxPool2d(2, 2)
-        
+
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.pool2 = nn.MaxPool2d(2, 2)
-        
+
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.pool3 = nn.MaxPool2d(2, 2)
-        
+
+        self.adaptive_pool = nn.AdaptiveAvgPool2d((8, 8))
+
         self.fc1 = nn.Linear(128 * 8 * 8, 128)
         self.dropout = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(128, 1)
+        self.fc2 = nn.Linear(128, num_classes)
         self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
-    
+
     def forward(self, x):
         x = self.relu(self.conv1(x))
         x = self.pool1(x)
-        
+
         x = self.relu(self.conv2(x))
         x = self.pool2(x)
-        
+
         x = self.relu(self.conv3(x))
         x = self.pool3(x)
-        
+
+        x = self.adaptive_pool(x)
         x = x.view(x.size(0), -1)
         x = self.relu(self.fc1(x))
         x = self.dropout(x)
-        x = self.sigmoid(self.fc2(x))
-        
+        x = self.fc2(x)
         return x
+
 
 # ============================================
 # 2. 모델 로드
 # ============================================
-# 역할: 지정한 경로에서 모델을 1회 로드해 평가 모드로 준비한다.
-def load_model(model_path):
-    model = CanPetCNN().to(device)
-    try:
-        model.load_state_dict(torch.load(model_path, map_location=device))
-        model.eval()
-        return model
-    except FileNotFoundError:
+def get_model_bundle():
+    global loaded_bundle
+    if loaded_bundle is not None:
+        return loaded_bundle
+
+    if not os.path.exists(MODEL_PATH):
         return None
 
+    checkpoint = torch.load(MODEL_PATH, map_location=device)
 
-# 역할: 전역 캐시를 사용해 모델을 지연 로드하고 재사용한다.
-def get_model():
-    global loaded_model
-    if loaded_model is None:
-        if not os.path.exists(MODEL_PATH):
-            return None
+    # 이전 형식(state_dict만 저장)도 호환한다.
+    if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+        class_names = checkpoint.get("class_names") or ["0", "1"]
+        state_dict = checkpoint["model_state_dict"]
+    else:
+        class_names = ["0", "1"]
+        state_dict = checkpoint
 
-        loaded_model = CanPetCNN().to(device)
-        loaded_model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-        loaded_model.eval()
-    return loaded_model
+    model = CanPetCNN(num_classes=len(class_names)).to(device)
+    model.load_state_dict(state_dict)
+    model.eval()
+
+    loaded_bundle = {
+        "model": model,
+        "class_names": class_names,
+    }
+    return loaded_bundle
+
 
 # ============================================
-# 3. 이미지 전처리 (흑백만)
+# 3. 이미지 전처리 (원본 RGB 유지)
 # ============================================
-# 역할: 입력 이미지를 모델 입력 형식(1x1x64x64)으로 변환한다.
-def preprocess_image_for_test(img_path):
+def preprocess_image_for_test(img_path: str):
     """
-    이미지를 흑백으로만 전처리
+    흑백/리사이징 없이 원본 RGB 이미지를 그대로 사용한다.
+    반환 shape: (1, 3, H, W)
     """
     try:
-        img = Image.open(img_path).convert('L')
-        img_array = np.array(img)
-    except Exception as e:
+        img = Image.open(img_path).convert("RGB")
+        img_array = np.array(img, dtype=np.float32) / 255.0
+    except Exception:
         return None
-    
-    # 64x64 리사이징
-    img_resized = cv2.resize(img_array, (64, 64))
-    
-    # 정규화 및 형태 변환
-    input_data = torch.FloatTensor(img_resized).reshape(1, 1, 64, 64) / 255.0
-    
+
+    chw = np.transpose(img_array, (2, 0, 1))
+    input_data = torch.from_numpy(chw).unsqueeze(0)
     return input_data.to(device)
+
 
 # ============================================
 # 4. 추론 함수
 # ============================================
-# 역할: 전처리된 이미지를 분류해 서비스 코드(0/1/2)와 신뢰도를 반환한다.
-def classify_image(model, img_path, confidence_threshold=0.5):
+def class_name_to_service_code(class_name: str, default_idx: int) -> int:
     """
-    이미지 분류
-    confidence_threshold 이상: 확실하게 분류
-    그 이하: 불확실한 것으로 간주 (0 반환)
+    클래스 폴더명이 숫자("0","1","2")면 그 값을 서비스 코드로 사용한다.
+    숫자가 아니면 분류 인덱스를 그대로 반환한다.
     """
-    input_data = preprocess_image_for_test(img_path)
-    
-    if input_data is None:
-        return 0, 0.0  # 읽기 실패 -> unknown(0)
-    
-    with torch.no_grad():
-        output = model(input_data)
-    
-    confidence = float(output[0][0].cpu().numpy())
-    
-    # 분류 결정
-    if confidence < 0.5:
-        # 캔에 가까움 -> 서비스 코드 1
-        confidence_diff = 0.5 - confidence
-        if confidence_diff > (1 - confidence_threshold):
-            return 1, confidence_diff
-        else:
-            return 0, confidence_diff
-    else:
-        # 패트에 가까움 -> 서비스 코드 2
-        confidence_diff = confidence - 0.5
-        if confidence_diff > (1 - confidence_threshold):
-            return 2, confidence_diff
-        else:
-            return 0, confidence_diff
+    text = str(class_name).strip()
+    if text.isdigit():
+        return int(text)
+    return int(default_idx)
 
-# ============================================
-# 역할: 단일 이미지 경로를 받아 모델 추론 결과 코드만 반환한다.
-def predict_now(img_path):
-    model = get_model()
-    if model is None:
+
+def classify_image(model, class_names, img_path: str):
+    input_data = preprocess_image_for_test(img_path)
+    if input_data is None:
+        return 0, 0.0
+
+    with torch.no_grad():
+        logits = model(input_data)
+        probs = torch.softmax(logits, dim=1)
+
+    pred_idx = int(torch.argmax(probs, dim=1).item())
+    confidence = float(probs[0, pred_idx].item())
+
+    if pred_idx < len(class_names):
+        service_code = class_name_to_service_code(class_names[pred_idx], pred_idx)
+    else:
+        service_code = pred_idx
+
+    return service_code, confidence
+
+
+def predict_now(img_path: str) -> int:
+    bundle = get_model_bundle()
+    if bundle is None:
         return 0
 
-    label, confidence = classify_image(model, img_path, confidence_threshold=0.7)
+    model = bundle["model"]
+    class_names = bundle["class_names"]
 
+    label, _confidence = classify_image(model, class_names, img_path)
     return int(label)
 
-# 역할: 파일을 분류해 결과 코드(0/1/2)를 반환한다.
+
 def analyze_image_for_motor(img_path: str) -> int:
     if not os.path.exists(img_path):
         return 0
     return int(predict_now(img_path))
 
+
 # FastAPI 엔드포인트 정의
-# 역할: 외부 요청으로 받은 이미지 경로를 추론해 JSON 결과로 응답한다.
 @app.post("/predict")
 def predict(req: PredictRequest) -> dict[str, int]:
     try:
@@ -171,9 +174,6 @@ def predict(req: PredictRequest) -> dict[str, int]:
         raise HTTPException(status_code=500, detail=f"predict failed: {exc}") from exc
 
 
-# 역할: 서비스 생존 여부를 확인하는 헬스체크 엔드포인트다.
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {"ok": True}
-
-

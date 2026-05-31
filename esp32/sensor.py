@@ -1,5 +1,6 @@
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 import paho.mqtt.client as mqtt
 import requests
@@ -52,31 +53,65 @@ def parse_sensor_payload(payload_str: str) -> tuple[object, str]:
 	return sensor_status, rand_num
 
 
+# 센서 상태값을 bool로 안전하게 해석한다.
+def is_sensor_triggered(sensor_status: object) -> bool:
+	if isinstance(sensor_status, bool):
+		return sensor_status
+
+	if isinstance(sensor_status, (int, float)):
+		return int(sensor_status) == 1
+
+	if isinstance(sensor_status, str):
+		normalized = sensor_status.strip().lower()
+		return normalized in {"1", "true", "on", "yes"}
+
+	return False
+
+
 # 센서 메시지를 처리하고, true일 때만 캡처/분류를 진행한다.
 def process_sensor_message(payload_str: str) -> None:
-	sensor_status, rand_num = parse_sensor_payload(payload_str)
+	try:
+		sensor_status, rand_num = parse_sensor_payload(payload_str)
+	except Exception:
+		# JSON 형식이 아니면 기존 문자열 규칙으로도 처리해본다.
+		raw = payload_str.strip().lower()
+		sensor_status = raw
+		rand_num = ""
 
-	if sensor_status is not True and int(sensor_status) != 1:
+	if not is_sensor_triggered(sensor_status):
 		return
 
-	image_path = fetch_still_image()
+	image_path = fetch_still_image(rand_num=rand_num)
 	if image_path is None:
 		return
 
 	classify_and_forward(image_path=image_path, rand_num=rand_num)
 
 
-# ESP32-CAM에서 정지 이미지를 받아 로컬에 저장한다.
-def fetch_still_image() -> Path | None:
+# 캡처 파일명을 생성한다. (시간 + 선택적 rand_num)
+def _build_capture_filename(rand_num: str) -> str:
+	# 마이크로초까지 포함해 연속 캡처에서도 파일명 충돌을 줄인다.
+	timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+	# 파일명에 안전한 영숫자만 남기고 길이를 제한한다.
+	safe_rand = "".join(ch for ch in rand_num if ch.isalnum())[:32]
+	if safe_rand:
+		return f"capture_{timestamp}_{safe_rand}.jpg"
+	return f"capture_{timestamp}.jpg"
+
+# ESP32-CAM 정지 이미지를 받아 latest와 이력 파일로 함께 저장한다.
+def fetch_still_image(rand_num: str = "") -> Path | None:
 	response = requests.get(CAM_URL, timeout=12, headers={"Connection": "close"})
 	if response.status_code != 200 or not response.content:
 		return None
 
 	PHOTO_DATA_DIR.mkdir(parents=True, exist_ok=True)
-	photo_data_path = PHOTO_DATA_DIR / "capture_latest.jpg"
-	LATEST_CAPTURE_PATH.write_bytes(response.content)
+	# 이력 보관용 파일 경로(요청마다 새 파일)
+	photo_data_path = PHOTO_DATA_DIR / _build_capture_filename(rand_num)
+	# 누적 보관용 파일
 	photo_data_path.write_bytes(response.content)
-	return photo_data_path
+	# 최신 1장 참조용 고정 파일(분류는 이 파일을 사용)
+	LATEST_CAPTURE_PATH.write_bytes(response.content)
+	return LATEST_CAPTURE_PATH
 
 
 # 캡처 이미지를 분류하고 결과 코드를 반환받아 DB에 저장한다.
