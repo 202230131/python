@@ -1,6 +1,8 @@
 import secrets
 import paho.mqtt.client as mqtt
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from esp32.database import db
 
 MQTT_HOST = "127.0.0.1"
@@ -8,6 +10,20 @@ MQTT_PORT = 1883
 DEFAULT_RANDOM_TOPIC = "esp32/random"
 
 app = FastAPI()
+
+app.add_middleware(
+	CORSMiddleware,
+	allow_origins=["*"],
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
+)
+
+
+class ExecuteRequest(BaseModel):
+	member_name: str
+	member_id: str
+	topic_name: str
 
 # 난수 생성 함수
 def new_rand_num() -> str:
@@ -40,15 +56,15 @@ def normalize_publish_topic(topic_name: str) -> str:
 
 # 웹에서 받은 회원정보와 토픽정보를 처리한다.
 @app.post("/execute")
-def handle_web_request(member_name: str, member_id: str, topic_name: str ) -> dict:
+def handle_web_request(payload: ExecuteRequest) -> dict:
 	random_key = new_rand_num()
-	publish_topic = normalize_publish_topic(topic_name)
+	publish_topic = normalize_publish_topic(payload.topic_name)
 
 	try:
 		db.insert_play_request(
 			rand_num=random_key,
-			member_name=member_name,
-			member_no=member_id,
+			member_name=payload.member_name,
+			member_no=payload.member_id,
 			topic_name=publish_topic,
 		)
 	except Exception as e:

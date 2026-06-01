@@ -17,7 +17,8 @@ MQTT_HOST = "127.0.0.1"
 MQTT_PORT = 1883
 MQTT_TOPIC = "esp32/sensor"
 
-CAM_URL = "http://192.168.137.240/capture"
+CAM_URL = "http://192.168.137.228/capture"
+CAM_CAPTURE_PARAMS = {"ledintensity": 160}
 
 LATEST_CAPTURE_PATH = BASE_DIR / "captured_image.jpg"
 PHOTO_DATA_DIR = BASE_DIR / "photoData"
@@ -100,7 +101,12 @@ def _build_capture_filename(rand_num: str) -> str:
 
 # ESP32-CAM 정지 이미지를 받아 latest와 이력 파일로 함께 저장한다.
 def fetch_still_image(rand_num: str = "") -> Path | None:
-	response = requests.get(CAM_URL, timeout=12, headers={"Connection": "close"})
+	response = requests.get(
+		CAM_URL,
+		params=CAM_CAPTURE_PARAMS,
+		timeout=12,
+		headers={"Connection": "close"},
+	)
 	if response.status_code != 200 or not response.content:
 		return None
 
