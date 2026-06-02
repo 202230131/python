@@ -1,7 +1,6 @@
 import os
 import threading
 import importlib
-from typing import Any
 
 # 데이터베이스 서비스 클래스 정의
 class DBService:
@@ -29,6 +28,29 @@ class DBService:
 			cursorclass=dict_cursor,
 		)
 
+	# rand_num 기준 조인 결과를 play_join_table에 upsert 저장만 수행한다.
+	def _upsert_play_join_row(self, cur, rand_num: str) -> None:
+		cur.execute(
+			"""
+			INSERT INTO play_join_table(rand_num, member_name, member_no, topic_name, result_value)
+			SELECT
+				p.rand_num,
+				p.member_name,
+				p.member_no,
+				p.topic_name,
+				r.result_value
+			FROM play_request_table p
+			LEFT JOIN play_result_table r ON r.rand_num = p.rand_num
+			WHERE p.rand_num = %s
+			ON DUPLICATE KEY UPDATE
+				member_name = VALUES(member_name),
+				member_no = VALUES(member_no),
+				topic_name = VALUES(topic_name),
+				result_value = VALUES(result_value)
+			""",
+			(rand_num,),
+		)
+
 	# play_request_table에 요청 정보를 삽입하는 메서드
 	def insert_play_request(self, rand_num: str, member_name: str, member_no: str, topic_name: str) -> None:
 		with self._lock:
@@ -42,6 +64,7 @@ class DBService:
 						""",
 						(rand_num, member_name, member_no, topic_name),
 					)
+					self._upsert_play_join_row(cur, rand_num)
 			finally:
 				conn.close()
 
@@ -59,32 +82,9 @@ class DBService:
 						""",
 						(rand_num, int(result_value)),
 					)
+					self._upsert_play_join_row(cur, rand_num)
 			finally:
 				conn.close()
-
-	# rand_num을 기준으로 play_request_table과 play_result_table을 조인하여 관련 정보를 조회하는 메서드
-	def get_play_relation(self, rand_num: str) -> dict[str, Any] | None:
-		conn = self._connect()
-		try:
-			with conn.cursor() as cur:
-				cur.execute(
-					"""
-					SELECT
-						p.rand_num,
-						p.member_name,
-						p.member_no,
-						p.topic_name,
-						r.result_value
-					FROM play_request_table p
-					LEFT JOIN play_result_table r ON r.rand_num = p.rand_num
-					WHERE p.rand_num = %s
-					""",
-					(rand_num,),
-				)
-				row = cur.fetchone()
-				return row
-		finally:
-			conn.close()
 
 # DBService 인스턴스를 생성하여 모듈 전체에서 사용할 수 있도록 한다.
 db = DBService()
