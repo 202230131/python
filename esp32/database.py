@@ -8,13 +8,13 @@ class DBService:
 	def __init__(self) -> None:
 		self.host = os.getenv("MYSQL_HOST", "127.0.0.1")
 		self.port = int(os.getenv("MYSQL_PORT", "3306"))
-		self.user = os.getenv("MYSQL_USER", "esp32")
+		self.user = os.getenv("MYSQL_USER", "root")
 		self.password = os.getenv("MYSQL_PASSWORD", "qwer1234")
 		self.database = os.getenv("MYSQL_DATABASE", "esp32")
 		self.charset = "utf8mb4"
 		self._lock = threading.Lock()
- 
-    # 데이터베이스 연결을 생성하는 내부 메서드
+
+	# 데이터베이스 연결을 생성하는 내부 메서드
 	def _connect(self):
 		pymysql = importlib.import_module("pymysql")
 		dict_cursor = importlib.import_module("pymysql.cursors").DictCursor
@@ -28,8 +28,8 @@ class DBService:
 			autocommit=True,
 			cursorclass=dict_cursor,
 		)
-    
-    # play_request_table에 요청 정보를 삽입하는 메서드
+
+	# play_request_table에 요청 정보를 삽입하는 메서드
 	def insert_play_request(self, rand_num: str, member_name: str, member_no: str, topic_name: str) -> None:
 		with self._lock:
 			conn = self._connect()
@@ -45,7 +45,7 @@ class DBService:
 			finally:
 				conn.close()
 
-    # play_result_table에 분류 결과를 삽입하거나 업데이트하는 메서드
+	# play_result_table에 분류 결과를 삽입하거나 업데이트하는 메서드
 	def insert_play_result(self, rand_num: str, result_value: int) -> None:
 		with self._lock:
 			conn = self._connect()
@@ -61,8 +61,8 @@ class DBService:
 					)
 			finally:
 				conn.close()
-    
-    # rand_num을 기준으로 play_request_table과 play_result_table을 조인하여 관련 정보를 조회하는 메서드
+
+	# rand_num을 기준으로 play_request_table과 play_result_table을 조인하여 관련 정보를 조회하는 메서드
 	def get_play_relation(self, rand_num: str) -> dict[str, Any] | None:
 		conn = self._connect()
 		try:

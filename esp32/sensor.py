@@ -2,6 +2,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+from requests import RequestException
 import paho.mqtt.client as mqtt
 import requests
 from esp32.test import analyze_image_for_motor
@@ -17,7 +18,10 @@ MQTT_HOST = "127.0.0.1"
 MQTT_PORT = 1883
 MQTT_TOPIC = "esp32/sensor"
 
-CAM_URL = "http://192.168.137.228/capture"
+# 현재는 센서 트리거 시 사진 캡처까지만 수행한다.
+ENABLE_CLASSIFICATION = False
+
+CAM_URL = "http://192.168.137.240/capture"
 CAM_CAPTURE_PARAMS = {"ledintensity": 160}
 
 LATEST_CAPTURE_PATH = BASE_DIR / "captured_image.jpg"
@@ -42,7 +46,10 @@ def on_connect(client, userdata, flags, rc):
 # MQTT 메시지 콜백에서 payload를 받아 처리 함수로 전달한다.
 def on_message(client, userdata, msg):
 	payload_str = msg.payload.decode("utf-8").strip()
-	process_sensor_message(payload_str)
+	try:
+		process_sensor_message(payload_str)
+	except Exception as e:
+		print(f"[sensor] message handling failed: {e}")
 
 
 	# 센서 토픽 payload에서 상태값과 난수를 추출한다.
@@ -84,6 +91,11 @@ def process_sensor_message(payload_str: str) -> None:
 
 	image_path = fetch_still_image(rand_num=rand_num)
 	if image_path is None:
+		print("[sensor] image capture failed; skipping classification")
+		return
+
+	if not ENABLE_CLASSIFICATION:
+		print(f"[sensor] capture-only mode enabled: {image_path}")
 		return
 
 	classify_and_forward(image_path=image_path, rand_num=rand_num)
@@ -101,13 +113,19 @@ def _build_capture_filename(rand_num: str) -> str:
 
 # ESP32-CAM 정지 이미지를 받아 latest와 이력 파일로 함께 저장한다.
 def fetch_still_image(rand_num: str = "") -> Path | None:
-	response = requests.get(
-		CAM_URL,
-		params=CAM_CAPTURE_PARAMS,
-		timeout=12,
-		headers={"Connection": "close"},
-	)
+	try:
+		response = requests.get(
+			CAM_URL,
+			params=CAM_CAPTURE_PARAMS,
+			timeout=12,
+			headers={"Connection": "close"},
+		)
+	except RequestException as e:
+		print(f"[sensor] camera request failed: {e}")
+		return None
+
 	if response.status_code != 200 or not response.content:
+		print(f"[sensor] camera returned status={response.status_code}, bytes={len(response.content)}")
 		return None
 
 	PHOTO_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -117,15 +135,28 @@ def fetch_still_image(rand_num: str = "") -> Path | None:
 	photo_data_path.write_bytes(response.content)
 	# 최신 1장 참조용 고정 파일(분류는 이 파일을 사용)
 	LATEST_CAPTURE_PATH.write_bytes(response.content)
+	print(f"[sensor] captured image saved: {photo_data_path}")
 	return LATEST_CAPTURE_PATH
 
 
 # 캡처 이미지를 분류하고 결과 코드를 반환받아 DB에 저장한다.
 def classify_and_forward(image_path: Path, rand_num: str) -> int:
-	result = int(analyze_image_for_motor(str(image_path)))
-	handle_classification_result(result)
+	try:
+		result = int(analyze_image_for_motor(str(image_path)))
+	except Exception as e:
+		print(f"[sensor] classification failed: {e}")
+		return -1
+
+	try:
+		handle_classification_result(result)
+	except Exception as e:
+		print(f"[sensor] motor command forward failed: {e}")
+
 	if rand_num:
-		db.insert_play_result(rand_num=rand_num, result_value=result)
+		try:
+			db.insert_play_result(rand_num=rand_num, result_value=result)
+		except Exception as e:
+			print(f"[sensor] db insert_play_result failed (rand_num={rand_num}): {e}")
 	return result
 
 
