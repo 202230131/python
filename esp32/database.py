@@ -86,6 +86,29 @@ class DBService:
 			finally:
 				conn.close()
 
+	# play_join_table에서 회원의 result_value를 집계해 포인트를 계산한다.
+	# 규칙: result_value가 1 또는 2면 true(1점), 0 또는 NULL이면 false(0점)
+	def get_member_points(self, member_no: str) -> int:
+		with self._lock:
+			conn = self._connect()
+			try:
+				with conn.cursor() as cur:
+					cur.execute(
+						"""
+						SELECT COALESCE(
+							SUM(CASE WHEN result_value IN (1, 2) THEN 1 ELSE 0 END),
+							0
+						) AS points
+						FROM play_join_table
+						WHERE member_no = %s OR member_name = %s
+						""",
+						(member_no, member_no),
+					)
+					row = cur.fetchone() or {}
+					return int(row.get("points") or 0)
+			finally:
+				conn.close()
+
 # DBService 인스턴스를 생성하여 모듈 전체에서 사용할 수 있도록 한다.
 db = DBService()
 

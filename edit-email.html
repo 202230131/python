@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이메일 변경</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", helvetica, sans-serif; background-color: #f2f4f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; -webkit-font-smoothing: antialiased; }
+        .edit-container { background-color: #ffffff; padding: 48px 40px; border-radius: 24px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.03); width: 360px; }
+        h2 { margin: 0 0 12px 0; color: #191f28; font-size: 24px; font-weight: 700; text-align: left; line-height: 1.4; }
+        .section-title { font-size: 14px; font-weight: 600; color: #4e5968; margin: 24px 0 8px 0; text-align: left; }
+        .input-group { margin-bottom: 24px; }
+        input { width: 100%; padding: 16px; background-color: #f9fafb; border: 1px solid transparent; border-radius: 12px; box-sizing: border-box; font-size: 15px; color: #191f28; outline: none; transition: all 0.2s ease; }
+        input:hover { background-color: #f2f4f6; }
+        input:focus { background-color: #ffffff; border-color: #3182f6; box-shadow: 0 0 0 1px #3182f6; }
+        button[type="submit"] { width: 100%; padding: 16px; background-color: #3182f6; color: #ffffff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2); transition: all 0.2s ease; }
+        button[type="submit"]:hover { background-color: #1b64da; box-shadow: 0 6px 16px rgba(49, 130, 246, 0.3); }
+        button[type="submit"]:active { transform: scale(0.98); }
+        .btn-back { display: block; width: 100%; padding: 16px; background-color: #f2f4f6; color: #4e5968; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; margin-top: 12px; transition: all 0.2s ease; }
+        .btn-back:hover { background-color: #e5e8eb; color: #191f28; }
+        .btn-back:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+    <div class="edit-container">
+        <h2>이메일 변경</h2>
+        <form id="editEmailForm">
+            <div class="section-title">새로운 이메일 주소</div>
+            <div class="input-group">
+                <input type="email" id="newEmail" placeholder="example@domain.com" required>
+            </div>
+            <button type="submit">이메일 저장</button>
+            <a href="main.html" class="btn-back">이전으로 돌아가기</a>
+        </form>
+    </div>
+
+    <script>
+        // 💡 [보안 가드막] 로그인 안 한 유저 강제 추방
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('isLoggedIn') !== 'true') {
+                alert('로그인이 필요한 서비스입니다.');
+                window.location.href = 'index.html';
+            }
+        });
+
+        document.getElementById('editEmailForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const newEmail = document.getElementById('newEmail').value.trim();
+            const currentNickname = localStorage.getItem('userNickname');
+
+            if (localStorage.getItem(`user_${newEmail}`)) {
+                alert('이미 사용 중인 이메일 주소입니다.');
+                return;
+            }
+
+            let userUpdated = false;
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('user_')) {
+                    const userData = JSON.parse(localStorage.getItem(key));
+                    if (userData.name === currentNickname) {
+                        userData.email = newEmail;
+                        localStorage.setItem(`user_${newEmail}`, JSON.stringify(userData));
+                        localStorage.removeItem(key);
+                        userUpdated = true;
+                        break;
+                    }
+                }
+            }
+
+            if (userUpdated) {
+                alert(`이메일 계정이 변경되었습니다. 다시 로그인 해주세요.`);
+                localStorage.removeItem('isLoggedIn'); // 보안을 위해 상태 파기
+                window.location.href = 'index.html'; 
+            }
+        });
+    </script>
+</body>
+</html>

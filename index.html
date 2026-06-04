@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", helvetica, sans-serif; background-color: #f2f4f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; -webkit-font-smoothing: antialiased; }
+        .login-container { background-color: #ffffff; padding: 48px 40px; border-radius: 24px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.03); width: 360px; }
+        h2 { margin: 0 0 32px 0; color: #191f28; font-size: 24px; font-weight: 700; text-align: left; }
+        .input-group { margin-bottom: 12px; }
+        input { width: 100%; padding: 16px; background-color: #f9fafb; border: 1px solid transparent; border-radius: 12px; box-sizing: border-box; font-size: 15px; color: #191f28; outline: none; transition: all 0.2s ease; }
+        input:hover { background-color: #f2f4f6; }
+        input:focus { background-color: #ffffff; border-color: #3182f6; box-shadow: 0 0 0 1px #3182f6; }
+        .password-container { position: relative; margin-bottom: 24px; width: 100%; }
+        .password-container input { padding-right: 65px; }
+        .password-container .toggle-btn { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #8b95a1; cursor: pointer; font-size: 13px; font-weight: 500; user-select: none; transition: color 0.2s ease; }
+        .password-container .toggle-btn:hover { color: #4e5968; }
+        button[type="submit"] { width: 100%; padding: 16px; background-color: #3182f6; color: #ffffff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2); transition: all 0.2s ease; margin-top: 10px; }
+        button[type="submit"]:hover { background-color: #1b64da; box-shadow: 0 6px 16px rgba(49, 130, 246, 0.3); }
+        button[type="submit"]:active { transform: scale(0.98); }
+        .links { margin-top: 28px; display: flex; justify-content: center; align-items: center; font-size: 13px; gap: 12px; }
+        .links a { color: #4e5968; text-decoration: none; font-weight: 500; transition: color 0.2s ease; }
+        .links a:hover { color: #3182f6; }
+        .links .divider { width: 1px; height: 12px; background-color: #e5e8eb; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>회원 계정으로<br>로그인하기</h2>
+        
+        <form id="loginForm">
+            <div class="input-group">
+                <input type="email" id="loginEmail" placeholder="이메일 주소" required>
+            </div>
+            
+            <div class="password-container">
+                <input type="password" id="loginPassword" placeholder="비밀번호" required>
+                <span class="toggle-btn" id="togglePassword">보기</span>
+            </div>
+            
+            <button type="submit">로그인</button>
+        </form>
+        
+        <div class="links">
+            <a href="register.html">회원가입</a>
+            <div class="divider"></div>
+            <a href="forgot-email.html">이메일 찾기</a>
+            <div class="divider"></div>
+            <a href="forgot-password.html">비밀번호 찾기</a>
+        </div>
+    </div>
+
+    <script>
+        // 비밀번호 보기/숨기기 토글
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('loginPassword');
+
+    togglePassword.addEventListener('click', function () {
+        input = passwordInput;
+        input.type = input.type === 'password' ? 'text' : 'password';
+        this.textContent = input.type === 'password' ? '보기' : '숨기기';
+    });
+
+    // 로그인 제출 및 가상 검증 로직
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault(); 
+        
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        
+        const storedUserRaw = localStorage.getItem(`user_${email}`);
+        
+        if (!storedUserRaw) {
+            alert('존재하지 않는 이메일 주소입니다. 회원가입을 먼저 진행해 주세요.');
+            return;
+        }
+
+        const userData = JSON.parse(storedUserRaw);
+
+        if (password === userData.password) {
+            alert(`${userData.name}님, 환영합니다!`);
+            
+            // 💡 [보안 추가] 로그인 성공 증명서(토큰 역할)를 로컬 스토리지에 저장합니다.
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('userNickname', userData.name);
+            
+            window.location.href = 'main.html'; 
+        } else {
+            alert('비밀번호가 일치하지 않습니다. 다시 확인해 주세요.');
+        }
+    });
+    </script>
+</body>
+</html>

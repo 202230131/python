@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>대시보드</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f2f4f6;
+            color: #191f28;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 16px;
+        }
+        .dashboard-layout {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .dashboard-card {
+            background: #fff;
+            border-radius: 24px;
+            padding: 24px 20px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.04);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            border: none;
+            outline: none;
+            text-align: left;
+        }
+
+        .profile-info { display: flex; align-items: center; gap: 14px; }
+        .profile-img {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #e8f3ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            user-select: none;
+        }
+        .profile-text .name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        .profile-text .welcome { font-size: 14px; color: #8b95a1; line-height: 1.4; }
+
+        .card-title { font-size: 16px; font-weight: 700; color: #4e5968; }
+        .point-amount { font-size: 22px; font-weight: 700; color: #3182f6; }
+        .btn-card { cursor: pointer; transition: all 0.2s; }
+        .btn-card:hover { background: #f9fafb; transform: translateY(-1px); }
+        .arrow-icon { font-size: 18px; font-weight: 700; color: #4e5968; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .modal-content {
+            background: #fff;
+            padding: 24px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 340px;
+            text-align: center;
+        }
+
+        .avatar-list {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin: 20px 0;
+            font-size: 34px;
+        }
+        .avatar-item {
+            width: 55px;
+            height: 55px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f2f4f6;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        .avatar-item:hover { background: #e8f3ff; transform: scale(1.08); }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: #8b95a1;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .close-btn {
+            width: 100%;
+            padding: 14px;
+            background: #3182f6;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <main class="dashboard-layout">
+        <section class="dashboard-card">
+            <div class="profile-info">
+                <div class="profile-img" id="profileImg">🦁</div>
+                <div class="profile-text">
+                    <div class="name">회원님</div>
+                    <div class="welcome">동물 아이콘을<br>클릭해보세요</div>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="handleLogout()">로그아웃</button>
+        </section>
+
+        <section class="dashboard-card">
+            <span class="card-title">나의 적립 포인트</span>
+            <span class="point-amount">로딩 중...</span>
+        </section>
+
+        <button class="dashboard-card btn-card" onclick="sendPlayRequest()" style="border: 2px solid #3182f6;">
+            <span class="card-title" style="color: #3182f6;">기기 제어 요청하기</span><span class="arrow-icon" style="color: #3182f6;">➔</span>
+        </button>
+
+        <button class="dashboard-card btn-card" onclick="location.href='edit-nickname.html'">
+            <span class="card-title">닉네임 변경</span><span class="arrow-icon">➔</span>
+        </button>
+        <button class="dashboard-card btn-card" onclick="location.href='edit-password.html'">
+            <span class="card-title">비밀번호 변경</span><span class="arrow-icon">➔</span>
+        </button>
+        <button class="dashboard-card btn-card" onclick="location.href='edit-question.html'">
+            <span class="card-title">본인확인 질문 변경</span><span class="arrow-icon">➔</span>
+        </button>
+        <button class="dashboard-card btn-card" onclick="location.href='edit-email.html'">
+            <span class="card-title">이메일 변경</span><span class="arrow-icon">➔</span>
+        </button>
+    </main>
+
+    <div id="avatarModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color:#191f28;">캐릭터 선택</h3>
+            <div class="avatar-list">
+                <button class="avatar-item">🦁</button>
+                <button class="avatar-item">🐯</button>
+                <button class="avatar-item">🐻‍❄️</button>
+                <button class="avatar-item">🦛</button>
+                <button class="avatar-item">🐱</button>
+                <button class="avatar-item">🐶</button>
+                <button class="avatar-item">🐹</button>
+                <button class="avatar-item">🐋</button>
+            </div>
+            <button class="close-btn" onclick="document.getElementById('avatarModal').style.display='none'">닫기</button>
+        </div>
+    </div>
+
+    <script>
+    const pImg = document.getElementById('profileImg');
+    const modal = document.getElementById('avatarModal');
+
+    // 호스트까지만 지정하고, 엔드포인트는 각 fetch에서 붙인다.
+    const SERVER_URL = "http://117.17.35.134:8000";
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        const loginStatus = localStorage.getItem('isLoggedIn');
+
+        if (loginStatus !== 'true') {
+            alert('로그인이 필요한 서비스입니다. 로그인 페이지로 이동합니다.');
+            window.location.replace('index.html');
+            return;
+        }
+
+        const savedName = localStorage.getItem('userNickname');
+        if (savedName) document.querySelector('.profile-text .name').textContent = savedName;
+
+        const savedAvatar = localStorage.getItem('userAvatar');
+        if (savedAvatar) pImg.textContent = savedAvatar;
+
+        const memberId = localStorage.getItem('memberId') || 'waterflame0227@naver.com';
+        await fetchMemberPoints(memberId);
+    });
+
+    async function fetchMemberPoints(memberId) {
+        const pointElement = document.querySelector('.point-amount');
+        try {
+            const response = await fetch(`${SERVER_URL}/member/${encodeURIComponent(memberId)}/points`);
+            const data = await response.json();
+
+            if (response.ok && data.status === 'success') {
+                pointElement.textContent = `${Number(data.points).toLocaleString()} P`;
+                pointElement.style.color = '#3182f6';
+            } else {
+                pointElement.textContent = '조회 실패';
+                pointElement.style.color = '#f04452';
+            }
+        } catch (error) {
+            console.error('포인트 로딩 실패:', error);
+            pointElement.textContent = '연결 실패';
+            pointElement.style.color = '#f04452';
+        }
+    }
+
+    async function sendPlayRequest() {
+        const savedName = localStorage.getItem('userNickname') || '회원님';
+        const savedId = localStorage.getItem('memberId') || 'waterflame0227@naver.com';
+        const targetTopic = 'esp32/random';
+
+        const requestData = {
+            member_name: savedName,
+            member_id: savedId,
+            topic_name: targetTopic
+        };
+
+        try {
+            const response = await fetch(`${SERVER_URL}/execute`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.status === 'success') {
+                alert(`요청 성공! 생성된 랜덤 키: ${data.generated_random_key}`);
+            } else {
+                alert(`요청 실패: ${data.detail || '알 수 없는 오류'}`);
+            }
+        } catch (error) {
+            console.error('서버 통신 실패:', error);
+            alert('서버 연결에 실패했습니다. 백엔드가 켜져있는지 확인하세요.');
+        }
+    }
+
+    pImg.addEventListener('click', () => modal.style.display = 'flex');
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+    });
+
+    document.querySelector('.avatar-list').addEventListener('click', (e) => {
+        const targetButton = e.target.closest('.avatar-item');
+        if (targetButton) {
+            const emoji = targetButton.textContent;
+            pImg.textContent = emoji;
+            localStorage.setItem('userAvatar', emoji);
+            modal.style.display = 'none';
+        }
+    });
+
+    function handleLogout() {
+        if (confirm('로그아웃 하시겠습니까?')) {
+            localStorage.removeItem('isLoggedIn');
+            localStorage.removeItem('memberId');
+            window.location.replace('index.html');
+        }
+    }
+    </script>
+</body>
+</html>

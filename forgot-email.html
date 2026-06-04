@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이메일 찾기</title>
+    <style>
+        /* 로그인, 회원가입 페이지와 완벽히 통일된 기본 시스템 서체 및 배경 설정 */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", helvetica, sans-serif; 
+            background-color: #f2f4f6; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            -webkit-font-smoothing: antialiased;
+            padding: 20px 0;
+            box-sizing: border-box;
+        }
+
+        /* 둥글고 입체감 있는 카드 레이아웃 */
+        .container { 
+            background-color: #ffffff; 
+            padding: 48px 40px; 
+            border-radius: 24px; 
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.03); 
+            width: 360px; 
+            box-sizing: border-box;
+        }
+
+        /* 타이틀 스타일: 왼쪽 정렬 및 두껍고 시원한 서체 */
+        h2 { 
+            margin: 0 0 12px 0; 
+            color: #191f28; 
+            font-size: 24px; 
+            font-weight: 700;
+            text-align: left;
+            line-height: 1.4;
+        }
+
+        /* 안내 문구 스타일 */
+        .subtitle {
+            font-size: 14px;
+            color: #8b95a1;
+            margin: 0 0 32px 0;
+            text-align: left;
+            line-height: 1.5;
+        }
+        
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        /* 토스 스타일의 미니멀리즘을 위해 레이블은 숨기거나 제거 */
+        label {
+            display: none;
+        }
+
+        /* 입력 폼 및 선택창 공통 스타일 */
+        input, select { 
+            width: 100%; 
+            padding: 16px; 
+            background-color: #f9fafb;
+            border: 1px solid transparent; 
+            border-radius: 12px; 
+            box-sizing: border-box; 
+            font-size: 15px; 
+            color: #191f28;
+            outline: none; 
+            transition: all 0.2s ease;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        /* select 태그용 세련된 화살표 아이콘 배경 추가 */
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://w3.org' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238b95a1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 16px;
+            cursor: pointer;
+        }
+
+        input:hover, select:hover {
+            background-color: #f2f4f6;
+        }
+
+        input:focus, select:focus { 
+            background-color: #ffffff;
+            border-color: #3182f6; 
+            box-shadow: 0 0 0 1px #3182f6;
+        }
+
+        /* 토스 시그니처 블루 버튼 */
+        button { 
+            width: 100%; 
+            padding: 16px; 
+            background-color: #3182f6; 
+            color: #ffffff; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2);
+            transition: all 0.2s ease; 
+            margin-top: 12px;
+        }
+
+        button:hover { 
+            background-color: #1b64da; 
+            box-shadow: 0 6px 16px rgba(49, 130, 246, 0.3);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* 하단 돌아가기 링크 */
+        .back-link-box {
+            margin-top: 28px;
+            text-align: center;
+        }
+
+        .back-link-box a { 
+            font-size: 13px;
+            color: #4e5968; 
+            text-decoration: none; 
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .back-link-box a:hover { 
+            color: #3182f6; 
+        }
+
+        /* 2단계: 결과 안내 화면 스타일 */
+        .result-box { 
+            display: none; 
+        }
+
+        /* 토스 감성의 강조된 결과 창 디자인 */
+        .result-email { 
+            font-size: 18px; 
+            font-weight: 600; 
+            color: #3182f6; 
+            margin: 24px 0; 
+            padding: 20px; 
+            background-color: #f2f4f6; 
+            border-radius: 16px; 
+            text-align: center;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 1단계: 질문 및 답변 입력 화면 -->
+    <div id="search-card">
+        <h2>이메일 찾기</h2>
+        <p class="subtitle">가입할 때 선택한 본인 확인 질문과<br>그에 맞는 답변을 정확히 입력해주세요.</p>
+        
+        <form id="find-form" onsubmit="handleFindEmail(event)">
+            <div class="form-group">
+                <label for="question">본인 확인 질문</label>
+                <select id="question" required>
+                    <option value="" disabled selected>질문을 선택해주세요</option>
+                    <option value="q1">가장 기억에 남는 선생님 성함은?</option>
+                    <option value="q2">처음 키웠던 반려동물의 이름은?</option>
+                    <option value="q3">받았던 선물 중 가장 기억에 남는 것은?</option>
+                    <option value="q4">가장 좋아하는 색깔은?</option>
+                    <option value="q5">자신의 보물 제1호는?</option>
+                    <option value="q6">자신의 인생 좌우명은?</option>
+                    <option value="q7">가장 좋아하는 음식은?</option>
+                    <option value="q8">어렸을 때 별명은?</option>
+                    <option value="q9">처음 입학한 학교의 이름은?</option>
+                    <option value="q10">인생에서 가장 기억에 남는 여행지는?</option>
+                    <option value="q11">가장 즐겨듣는 음악은?</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="answer">답변 입력</label>
+                <input type="text" id="answer" placeholder="답변을 입력하세요" required>
+            </div>
+            <button type="submit">이메일 찾기</button>
+            
+            <div class="back-link-box">
+                <a href="index.html">로그인 화면으로 돌아가기</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- 2단계: 결과 안내 화면 -->
+    <div id="result-card" class="result-box">
+        <h2>이메일 찾기 완료</h2>
+        <p class="subtitle">입력하신 정보와 일치하는 이메일 계정입니다. 보안을 위해 일부 글자가 가려집니다.</p>
+        <div class="result-email" id="user-email">user@example.com</div>
+        <button onclick="location.reload()">로그인 화면으로</button>
+    </div>
+</div>
+
+<script>
+    function handleFindEmail(event) {
+        event.preventDefault(); // 폼 제출 시 새로고침 방지
+
+        const question = document.getElementById('question').value;
+        const answer = document.getElementById('answer').value.trim();
+
+        if (!question) {
+            alert("본인 확인 질문을 선택해주세요.");
+            return;
+        }
+        if (answer === "") {
+            alert("답변을 입력해주세요.");
+            return;
+        }
+
+        let foundEmail = null;
+
+        // 로컬 스토리지에 가상 저장된 모든 회원 데이터를 순회하며 질문/답변 매칭 검사
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            
+            // 회원 정보 키값인 것만 필터링 (user_로 시작하는 데이터)
+            if (key.startsWith('user_')) {
+                const userData = JSON.parse(localStorage.getItem(key));
+                
+                // 질문과 답변이 모두 일치하는 유저 발견 시
+                if (userData.question === question && userData.answer === answer) {
+                    foundEmail = userData.email;
+                    break;
+                }
+            }
+        }
+
+        // 결과 처리
+        if (foundEmail) {
+            // 보안을 위해 이메일 아이디의 일부를 가려주는 마스킹 처리 (예: abcde****@naver.com)
+            const [id, domain] = foundEmail.split('@');
+            let maskedId = id;
+            if (id.length > 3) {
+                maskedId = id.substring(0, 3) + '*'.repeat(id.length - 3);
+            } else {
+                maskedId = id[0] + '*'.repeat(id.length - 1);
+            }
+            const displayEmail = `${maskedId}@${domain}`;
+
+            // 결과 안내 화면단으로 가상 이메일 노출 및 화면 전환
+            document.getElementById('user-email').innerText = displayEmail;
+            document.getElementById('search-card').style.display = 'none';
+            document.getElementById('result-card').style.display = 'block';
+        } else {
+            alert('입력하신 정보와 일치하는 회원 정보를 찾을 수 없습니다.');
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>회원가입</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f2f4f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        
+        /* 💡 [변경] 가로폭을 360px에서 400px로 넓혀 텍스트 공간을 충분히 확보했습니다. */
+        .register-container { 
+            background: #fff; 
+            padding: 48px 40px; 
+            border-radius: 24px; 
+            box-shadow: 0 12px 40px rgba(0,0,0,0.03); 
+            width: 400px; 
+            box-sizing: border-box; 
+        }
+        
+        h2 { margin: 0 0 32px 0; color: #191f28; font-size: 24px; font-weight: 700; }
+        .input-group { position: relative; margin-bottom: 12px; }
+        input, select { width: 100%; padding: 16px; background: #f9fafb; border: 1px solid transparent; border-radius: 12px; box-sizing: border-box; font-size: 15px; outline: none; }
+        input:focus, select:focus { background: #fff; border-color: #3182f6; box-shadow: 0 0 0 1px #3182f6; }
+        .toggle-btn { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #8b95a1; cursor: pointer; font-size: 13px; user-select: none; }
+        .password-message { font-size: 12px; margin: -6px 0 12px 6px; text-align: left; display: none; font-weight: 500; }
+        button { width: 100%; padding: 16px; background: #3182f6; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 12px; }
+        button:active { transform: scale(0.98); }
+        .links { margin-top: 28px; text-align: center; font-size: 13px; }
+        .links a { color: #4e5968; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h2>회원가입을 통해<br>서비스를 이용해 보세요.</h2>
+        <form id="registerForm">
+            <div class="input-group"><input type="text" id="regName" placeholder="이름" required></div>
+            <div class="input-group">
+                <select id="question" required>
+                    <option value="" disabled selected>본인확인 질문 선택</option>
+                    <option value="q1">가장 기억에 남는 선생님 성함은?</option>
+                    <option value="q2">처음 키웠던 반려동물의 이름은?</option>
+                    <option value="q3">받았던 선물 중 가장 기억에 남는 것은?</option>
+                    <option value="q4">가장 좋아하는 색깔은?</option>
+                </select>
+            </div>
+            <div class="input-group"><input type="text" id="answer" placeholder="질문 답변 입력" required></div>
+            <div class="input-group"><input type="email" id="regEmail" placeholder="이메일 주소" required></div>
+            
+            <!-- 가로폭이 넓어져서 이제 원래 긴 글자도 잘림 없이 깔끔하게 수용합니다. -->
+            <div class="input-group">
+                <input type="password" id="regPassword" style="padding-right:65px;" placeholder="비밀번호 (8자 이상, 문자/숫자/특수문자 조합)" required>
+                <span class="toggle-btn" id="toggleRegPassword">보기</span>
+            </div>
+            <div id="passwordMsg" class="password-message"></div>
+            
+            <div class="input-group">
+                <input type="password" id="regPasswordConfirm" style="padding-right:65px;" placeholder="비밀번호 확인" required>
+                <span class="toggle-btn" id="toggleConfirmPassword">보기</span>
+            </div>
+            <button type="submit">회원가입하기</button>
+        </form>
+        <div class="links"><a href="index.html">이미 계정이 있으신가요? 로그인</a></div>
+    </div>
+
+    <script>
+        const setupToggle = (tId, iId) => {
+            document.getElementById(tId).addEventListener('click', function() {
+                const input = document.getElementById(iId);
+                input.type = input.type === 'password' ? 'text' : 'password';
+                this.textContent = input.type === 'password' ? '보기' : '숨기기';
+            });
+        };
+        setupToggle('toggleRegPassword', 'regPassword');
+        setupToggle('toggleConfirmPassword', 'regPasswordConfirm');
+
+        const pInput = document.getElementById('regPassword');
+        const pMsg = document.getElementById('passwordMsg');
+        let isPassValid = false;
+
+        pInput.addEventListener('input', function() {
+            const v = this.value;
+            pMsg.style.display = v ? "block" : "none";
+            
+            isPassValid = v.length >= 8 && /[A-Za-z]/.test(v) && /[0-9]/.test(v) && /[^A-Za-z0-9]/.test(v);
+            pMsg.textContent = isPassValid ? "✅ 안전한 비밀번호입니다." : "❌ 8자 이상 영문/숫자/특수문자를 조합하세요.";
+            pMsg.style.color = isPassValid ? "#2da44e" : "#f04452";
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value;
+
+            if (localStorage.getItem(`user_${email}`)) return alert('이미 가입된 이메일 주소입니다.');
+            if (!isPassValid) return alert('비밀번호 보안 규칙을 준수해 주세요.');
+            if (password !== document.getElementById('regPasswordConfirm').value) return alert('비밀번호가 일치하지 않습니다.');
+
+            const userData = {
+                name: document.getElementById('regName').value.trim(),
+                email: email, password: password,
+                question: document.getElementById('question').value,
+                answer: document.getElementById('answer').value.trim()
+            };
+
+            localStorage.setItem(`user_${email}`, JSON.stringify(userData));
+            localStorage.setItem('userNickname', userData.name);
+            alert(`${userData.name}님, 가입이 완료되었습니다!`);
+            window.location.href = 'index.html';
+        });
+    </script>
+</body>
+</html>
